@@ -2,67 +2,138 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8" />
-    <title>Nhập hàng hóa mới</title>
+    <title>Search Hàng Hóa</title>
+    <!-- Nếu bạn có file CSS, link vào ở đây -->
+    <link rel="stylesheet" href="./css/style.css" />
+    <style>
+      /* Nếu bạn chưa có file style.css, bạn có thể viết tạm CSS cơ bản ở đây */
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      h1 {
+        margin-bottom: 20px;
+      }
+      form label {
+        display: inline-block;
+        width: 120px;
+      }
+      form input[type="text"] {
+        width: 250px;
+        padding: 5px;
+      }
+      form button {
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 20px;
+      }
+      th, td {
+        border: 1px solid #ccc;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+      #message {
+        margin-top: 15px;
+        color: red;
+      }
+    </style>
 </head>
 <body>
-    <h1>Đăng ký hàng hóa mới</h1>
-    <form id="addForm">
-        <label for="name">Tên hàng hóa:</label>
-        <input type="text" id="name" name="name" required /><br />
-
-        <label for="quantity">Số lượng:</label>
-        <input type="number" id="quantity" name="quantity" min="0" required /><br />
-
-        <label for="price">Giá (VNĐ):</label>
-        <input type="number" id="price" name="price" min="0" required /><br />
-
-        <button type="submit">Thêm mới</button>
+    <h1>Tìm kiếm hàng hóa</h1>
+    <form id="searchForm">
+        <label for="keyword">Tên hàng hóa:</label>
+        <input type="text" id="keyword" name="keyword" placeholder="Nhập từ khóa" required />
+        <button type="submit">Tìm</button>
     </form>
 
     <p id="message"></p>
 
+    <table id="resultsTable" style="display: none;">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Tên</th>
+                <th>Số lượng</th>
+                <th>Giá</th>
+            </tr>
+        </thead>
+        <tbody id="resultsBody">
+            <!-- Kết quả sẽ được chèn ở đây -->
+        </tbody>
+    </table>
+
     <script>
-        // Địa chỉ API nhập liệu (phải khớp với host và cổng của service)
-       const apiUrl = 'http://localhost:4000/api/inventory';
+        // Địa chỉ API Search bạn vừa tạo ở bước 1
+        const apiUrl = 'http://localhost:3000/api/search';
 
+        document.getElementById('searchForm').addEventListener('submit', function(event) {
+            event.preventDefault(); // Ngăn form reload page
 
-        document.getElementById('addForm').addEventListener('submit', function(event) {
-            event.preventDefault();
+            const keyword = document.getElementById('keyword').value.trim();
+            const messageElem = document.getElementById('message');
+            const resultsTable = document.getElementById('resultsTable');
+            const resultsBody = document.getElementById('resultsBody');
 
-            const name = document.getElementById('name').value.trim();
-            const quantity = document.getElementById('quantity').value;
-            const price = document.getElementById('price').value;
+            // Xóa nội dung cũ nếu có
+            messageElem.textContent = '';
+            resultsBody.innerHTML = '';
+            resultsTable.style.display = 'none';
 
-            fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    name: name,
-                    quantity: quantity,
-                    price: price
+            if (!keyword) {
+                messageElem.textContent = 'Vui lòng nhập từ khóa tìm kiếm';
+                return;
+            }
+
+            // Gọi đến API Search
+            fetch(`${apiUrl}?keyword=${encodeURIComponent(keyword)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        // Nếu API trả về lỗi (status 4xx hoặc 5xx), hiển thị thông báo
+                        return response.text().then(text => {
+                            throw new Error(`HTTP ${response.status}: ${text}`);
+                        });
+                    }
+                    // Parse JSON trả về
+                    return response.json();
                 })
-            })
-            .then(response => response.json())
-            .then(data => {
-                const msgElem = document.getElementById('message');
-                if (data.success) {
-                    msgElem.style.color = 'green';
-                    msgElem.textContent = 'Thêm thành công. ID: ' + data.insertedId;
-                    // Xóa nội dung form sau khi thêm thành công
-                    document.getElementById('addForm').reset();
-                } else {
-                    msgElem.style.color = 'red';
-                    msgElem.textContent = 'Lỗi: ' + data.message;
-                }
-            })
-            .catch(error => {
-                const msgElem = document.getElementById('message');
-                msgElem.style.color = 'red';
-                msgElem.textContent = 'Không thể kết nối tới server nhập liệu';
-                console.error('Fetch error:', error);
-            });
+                .then(data => {
+                    if (Array.isArray(data) && data.length > 0) {
+                        // Hiển thị bảng kết quả
+                        resultsTable.style.display = 'table';
+                        data.forEach(item => {
+                            const row = document.createElement('tr');
+                            const cellId = document.createElement('td');
+                            const cellName = document.createElement('td');
+                            const cellQuantity = document.createElement('td');
+                            const cellPrice = document.createElement('td');
+
+                            cellId.textContent = item.id;
+                            cellName.textContent = item.name;
+                            cellQuantity.textContent = item.quantity;
+                            cellPrice.textContent = item.price;
+
+                            row.appendChild(cellId);
+                            row.appendChild(cellName);
+                            row.appendChild(cellQuantity);
+                            row.appendChild(cellPrice);
+                            resultsBody.appendChild(row);
+                        });
+                    } else {
+                        // Nếu mảng rỗng, không tìm thấy kết quả
+                        messageElem.textContent = `Không tìm thấy kết quả cho "${keyword}"`;
+                    }
+                })
+                .catch(err => {
+                    console.error('Lỗi khi gọi API Search:', err);
+                    messageElem.textContent = 'Có lỗi xảy ra khi tìm kiếm. Vui lòng thử lại sau.';
+                });
         });
     </script>
 </body>
